@@ -16,16 +16,18 @@ import Navbar from './components/Navbar';
 function App() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored token
     const storedToken = localStorage.getItem('pratyahara_token');
     const storedUser = localStorage.getItem('pratyahara_user');
-    
+    const storedGuest = localStorage.getItem('pratyahara_guest');
     if (storedToken && storedUser) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
+    } else if (storedGuest === 'true') {
+      setIsGuest(true);
     }
     setLoading(false);
   }, []);
@@ -33,15 +35,26 @@ function App() {
   const handleLogin = (authData) => {
     setToken(authData.access_token);
     setUser(authData.user);
+    setIsGuest(false);
     localStorage.setItem('pratyahara_token', authData.access_token);
     localStorage.setItem('pratyahara_user', JSON.stringify(authData.user));
+    localStorage.removeItem('pratyahara_guest');
+  };
+
+  const handleGuestLogin = () => {
+    setIsGuest(true);
+    setToken(null);
+    setUser(null);
+    localStorage.setItem('pratyahara_guest', 'true');
   };
 
   const handleLogout = () => {
     setToken(null);
     setUser(null);
+    setIsGuest(false);
     localStorage.removeItem('pratyahara_token');
     localStorage.removeItem('pratyahara_user');
+    localStorage.removeItem('pratyahara_guest');
   };
 
   if (loading) {
@@ -52,25 +65,37 @@ function App() {
     );
   }
 
-  if (!token) {
-    return <Login onLogin={handleLogin} />;
+  if (!token && !isGuest) {
+    return <Login onLogin={handleLogin} onGuestLogin={handleGuestLogin} />;
   }
 
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-        <Navbar onLogout={handleLogout} user={user} />
+        <Navbar onLogout={handleLogout} user={user} isGuest={isGuest} />
         <div className="pt-16">
+          {isGuest && (
+            <div className="bg-gradient-to-r from-amber-400 to-orange-400 text-white text-center py-2 px-4 text-sm font-medium">
+              👋 You're browsing as a Guest — data won't be saved permanently.{' '}
+              <button
+                onClick={handleLogout}
+                className="underline font-bold hover:text-amber-100 transition-colors"
+              >
+                Sign Up / Login
+              </button>{' '}
+              to save your progress!
+            </div>
+          )}
           <Routes>
-            <Route path="/" element={<Dashboard token={token} user={user} />} />
-            <Route path="/mood" element={<MoodCheckIn token={token} />} />
-            <Route path="/journal" element={<Journal token={token} />} />
-            <Route path="/meditation" element={<Meditation token={token} />} />
-            <Route path="/breathing" element={<Breathing token={token} />} />
-            <Route path="/analytics" element={<Analytics token={token} />} />
-            <Route path="/chat" element={<Chat token={token} />} />
-            <Route path="/media" element={<MediaPlayer token={token} />} />
-            <Route path="/profile" element={<Profile token={token} user={user} />} />
+            <Route path="/" element={<Dashboard token={token} user={user} isGuest={isGuest} />} />
+            <Route path="/mood" element={<MoodCheckIn token={token} isGuest={isGuest} />} />
+            <Route path="/journal" element={<Journal token={token} isGuest={isGuest} />} />
+            <Route path="/meditation" element={<Meditation token={token} isGuest={isGuest} />} />
+            <Route path="/breathing" element={<Breathing token={token} isGuest={isGuest} />} />
+            <Route path="/analytics" element={<Analytics token={token} isGuest={isGuest} />} />
+            <Route path="/chat" element={<Chat token={token} isGuest={isGuest} />} />
+            <Route path="/media" element={<MediaPlayer token={token} isGuest={isGuest} />} />
+            <Route path="/profile" element={isGuest ? <Navigate to="/" replace /> : <Profile token={token} user={user} />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

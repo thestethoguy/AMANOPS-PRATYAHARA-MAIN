@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Wind, Mail, Lock, Eye, EyeOff, Fingerprint } from 'lucide-react';
+import { Wind, Mail, Lock, Eye, EyeOff, Fingerprint, UserCheck } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
-function Login({ onLogin }) {
+function Login({ onLogin, onGuestLogin }) {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,13 +29,9 @@ function Login({ onLogin }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
       const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-      const response = await axios.post(`${API_URL}${endpoint}`, {
-        email,
-        password,
-      });
+      const response = await axios.post(`${API_URL}${endpoint}`, { email, password });
       onLogin(response.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed');
@@ -80,13 +76,8 @@ function Login({ onLogin }) {
     try {
       setLoading(true);
       setError('');
-
-      const challengeResponse = await axios.post(`${API_URL}/api/auth/webauthn/login-challenge`, {
-        email,
-      });
-
+      const challengeResponse = await axios.post(`${API_URL}/api/auth/webauthn/login-challenge`, { email });
       const { challenge, credentials } = challengeResponse.data;
-
       const credentialRequestOptions = {
         challenge: Uint8Array.from(atob(challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
         allowCredentials: credentials.map(id => ({
@@ -95,15 +86,10 @@ function Login({ onLogin }) {
         })),
         timeout: 60000,
       };
-
-      const assertion = await navigator.credentials.get({
-        publicKey: credentialRequestOptions,
-      });
-
+      const assertion = await navigator.credentials.get({ publicKey: credentialRequestOptions });
       const verifyResponse = await axios.post(`${API_URL}/api/auth/webauthn/login-verify`, {
         credential_id: btoa(String.fromCharCode(...new Uint8Array(assertion.rawId))),
       });
-
       onLogin(verifyResponse.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Biometric authentication failed');
@@ -131,22 +117,14 @@ function Login({ onLogin }) {
           <div className="flex mb-6 bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setIsRegister(false)}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-                !isRegister
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-600'
-              }`}
+              className={`flex-1 py-2 rounded-lg font-medium transition-all ${!isRegister ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600'}`}
               data-testid="login-tab"
             >
               Login
             </button>
             <button
               onClick={() => setIsRegister(true)}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all ${
-                isRegister
-                  ? 'bg-white text-purple-600 shadow-sm'
-                  : 'text-gray-600'
-              }`}
+              className={`flex-1 py-2 rounded-lg font-medium transition-all ${isRegister ? 'bg-white text-purple-600 shadow-sm' : 'text-gray-600'}`}
               data-testid="register-tab"
             >
               Register
@@ -161,9 +139,7 @@ function Login({ onLogin }) {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -179,9 +155,7 @@ function Login({ onLogin }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -225,31 +199,43 @@ function Login({ onLogin }) {
             )}
           </form>
 
-          {/* Biometric Login */}
-          {!isRegister && biometricSupported && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
-                </div>
-              </div>
+          {/* Divider */}
+          <div className="my-5 relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-200"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {/* Biometric Login */}
+            {!isRegister && biometricSupported && (
               <button
                 onClick={handleBiometricLogin}
                 disabled={loading || !email}
-                className="mt-4 w-full flex items-center justify-center space-x-2 py-3 border-2 border-purple-200 rounded-lg text-purple-600 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center space-x-2 py-3 border-2 border-purple-200 rounded-lg text-purple-600 hover:bg-purple-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="biometric-login-button"
               >
                 <Fingerprint className="w-5 h-5" />
                 <span className="font-medium">Biometric Login</span>
               </button>
-              <p className="mt-2 text-xs text-gray-500 text-center">
-                Enter your email and use fingerprint/face to login
-              </p>
-            </div>
-          )}
+            )}
+
+            {/* Guest Login */}
+            <button
+              onClick={onGuestLogin}
+              className="w-full flex items-center justify-center space-x-2 py-3 border-2 border-amber-300 bg-amber-50 rounded-lg text-amber-700 hover:bg-amber-100 transition-all font-medium"
+              data-testid="guest-login-button"
+            >
+              <UserCheck className="w-5 h-5" />
+              <span>Continue as Guest</span>
+            </button>
+            <p className="text-xs text-gray-400 text-center">
+              Explore freely — no account needed, no data saved
+            </p>
+          </div>
         </div>
 
         <p className="text-center text-gray-600 text-sm mt-6">
@@ -262,54 +248,19 @@ function Login({ onLogin }) {
             <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
               <h2 className="text-2xl font-bold text-gray-800 mb-2">Reset Password</h2>
               <p className="text-gray-600 text-sm mb-6">Enter your email and choose a new password.</p>
-
               {forgotMessage && (
-                <div className={`mb-4 p-3 rounded-lg text-sm ${
-                  forgotMessage.includes('✅')
-                    ? 'bg-green-50 border border-green-200 text-green-700'
-                    : 'bg-red-50 border border-red-200 text-red-700'
-                }`}>
+                <div className={`mb-4 p-3 rounded-lg text-sm ${forgotMessage.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
                   {forgotMessage}
                 </div>
               )}
-
               <form onSubmit={handleForgotPassword} className="space-y-4">
-                <input
-                  type="email"
-                  placeholder="Your email address"
-                  value={forgotEmail}
-                  onChange={(e) => setForgotEmail(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                />
-                <input
-                  type="password"
-                  placeholder="New password"
-                  value={forgotNewPassword}
-                  onChange={(e) => setForgotNewPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                />
-                <input
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={forgotConfirmPassword}
-                  onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={forgotLoading}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
-                >
+                <input type="email" placeholder="Your email address" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" required />
+                <input type="password" placeholder="New password" value={forgotNewPassword} onChange={(e) => setForgotNewPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" required />
+                <input type="password" placeholder="Confirm new password" value={forgotConfirmPassword} onChange={(e) => setForgotConfirmPassword(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent" required />
+                <button type="submit" disabled={forgotLoading} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50">
                   {forgotLoading ? 'Resetting...' : 'Reset Password'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowForgotPassword(false); setForgotMessage(''); }}
-                  className="w-full py-3 border-2 border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-all"
-                >
+                <button type="button" onClick={() => { setShowForgotPassword(false); setForgotMessage(''); }} className="w-full py-3 border-2 border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-all">
                   Cancel
                 </button>
               </form>
