@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 import { Wind, Play, Pause } from 'lucide-react';
 
-function Breathing() {
+function Breathing({ token }) {
   const [phase, setPhase] = useState('ready'); // ready, inhale, hold, exhale
   const [count, setCount] = useState(0);
   const [isActive, setIsActive] = useState(false);
@@ -44,6 +47,24 @@ function Breathing() {
     return () => clearInterval(interval);
   }, [isActive, currentPattern, currentPatternIndex]);
 
+  const saveBreathingSession = async (completedRounds) => {
+    if (completedRounds === 0 || !token) return;
+    try {
+      await axios.post(
+        `${API_URL}/api/meditation`,
+        {
+          duration_minutes: Math.round((completedRounds * 16) / 60),
+          session_type: "breathing",
+          rounds_completed: completedRounds
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    } catch (error) {
+      console.error('Error saving breathing session:', error);
+    }
+  };
   const handleStart = () => {
     setIsActive(true);
     if (phase === 'ready') {
@@ -55,9 +76,11 @@ function Breathing() {
 
   const handlePause = () => {
     setIsActive(false);
+    saveBreathingSession(rounds);
   };
 
   const handleReset = () => {
+    saveBreathingSession(rounds);
     setIsActive(false);
     setPhase('ready');
     setCount(0);

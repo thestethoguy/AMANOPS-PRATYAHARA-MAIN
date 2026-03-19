@@ -117,6 +117,19 @@ class WebAuthnVerifyRequest(BaseModel):
     user_id: str
     credential: Dict[str, Any]
 
+class MeditationSession(BaseModel):
+    duration_minutes: int
+    session_type: str = "meditation"
+    rounds_completed: Optional[int] = None
+
+class MeditationSessionResponse(BaseModel):
+    id: str
+    user_id: str
+    duration_minutes: int
+    session_type: str
+    rounds_completed: Optional[int]
+    created_at: str
+
 class MediaItem(BaseModel):
     id: str
     title: str
@@ -341,6 +354,33 @@ async def get_analytics_summary(current_user: dict = Depends(get_current_user), 
         mood_distribution[mood_type] = mood_distribution.get(mood_type, 0) + 1
     avg_intensity = sum(m["intensity"] for m in moods) / len(moods) if moods else 0
     return {"period_days": days, "total_moods": len(moods), "total_journals": len(journals), "mood_distribution": mood_distribution, "average_intensity": round(avg_intensity, 2), "current_streak": streak["current_streak"] if streak else 0, "longest_streak": streak["longest_streak"] if streak else 0, "moods_by_day": moods}
+
+# ==================== MEDITATION ROUTES ====================
+
+@api_router.post("/meditation", response_model=MeditationSessionResponse)
+async def save_meditation_session(session: MeditationSession, current_user: dict = Depends(get_current_user)):
+    session_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    session_doc = {
+        "id": session_id,
+        "user_id": current_user["id"],
+        "duration_minutes": session.duration_minutes,
+        "session_type": session.session_type,
+        "rounds_completed": session.rounds_completed,
+        "created_at": created_at
+    }
+    await db.meditation_sessions.insert_one(session_doc)
+    await update_user_streak(current_user["id"])
+    return MeditationSessionResponse(**session_doc)
+
+@api_router.get("/meditation/history", response_model=List[MeditationSessionResponse])
+async def get_meditation_history(current_user: dict = Depends(get_current_user), days: int = 30):
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+    sessions = await db.meditation_sessions.find(
+        {"user_id": current_user["id"], "created_at": {"$gte": cutoff_date.isoformat()}},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(1000)
+    return [MeditationSessionResponse(**s) for s in sessions]
 
 # ==================== MEDIA ROUTES ====================
 # All audio files use verified direct MP3 links from archive.org

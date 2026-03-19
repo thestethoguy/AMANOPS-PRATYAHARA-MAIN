@@ -21,7 +21,7 @@ function Meditation({ token }) {
           if (time <= 1) {
             setIsActive(false);
             setCompleted(true);
-            updateStreak();
+            saveSessionAndUpdateStreak();
             return 0;
           }
           return time - 1;
@@ -34,17 +34,21 @@ function Meditation({ token }) {
     return () => clearInterval(interval);
   }, [isActive, timeLeft]);
 
-  const updateStreak = async () => {
+  const saveSessionAndUpdateStreak = async () => {
     try {
       await axios.post(
-        `${API_URL}/api/streak/update`,
-        {},
+        `${API_URL}/api/meditation`,
+        {
+          duration_minutes: duration,
+          session_type: "meditation",
+          rounds_completed: null
+        },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
     } catch (error) {
-      console.error('Error updating streak:', error);
+      console.error('Error saving meditation session:', error);
     }
   };
 

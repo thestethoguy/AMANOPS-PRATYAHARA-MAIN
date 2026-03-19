@@ -66,7 +66,7 @@ function App() {
             <Route path="/mood" element={<MoodCheckIn token={token} />} />
             <Route path="/journal" element={<Journal token={token} />} />
             <Route path="/meditation" element={<Meditation token={token} />} />
-            <Route path="/breathing" element={<Breathing />} />
+            <Route path="/breathing" element={<Breathing token={token} />} />
             <Route path="/analytics" element={<Analytics token={token} />} />
             <Route path="/chat" element={<Chat token={token} />} />
             <Route path="/media" element={<MediaPlayer token={token} />} />
