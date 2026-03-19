@@ -117,26 +117,8 @@ class WebAuthnVerifyRequest(BaseModel):
     user_id: str
     credential: Dict[str, Any]
 
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-    new_password: str    
-
-class MeditationSession(BaseModel):
-    duration_minutes: int
-    session_type: str = "meditation"
-    rounds_completed: Optional[int] = None
-
-class MeditationSessionResponse(BaseModel):
-    id: str
-    user_id: str
-    duration_minutes: int
-    session_type: str
-    rounds_completed: Optional[int]
-    created_at: str
+class UpdateUsernameRequest(BaseModel):
+    username: str
 
 class MediaItem(BaseModel):
     id: str
@@ -186,12 +168,13 @@ async def register(user_data: UserRegister):
         raise HTTPException(status_code=400, detail="Email already registered")
     user_id = str(uuid.uuid4())
     hashed_pw = hash_password(user_data.password)
-    user_doc = {"id": user_id, "email": user_data.email, "password_hash": hashed_pw, "created_at": datetime.now(timezone.utc).isoformat(), "webauthn_credentials": []}
+    default_username = user_data.email.split("@")[0]
+    user_doc = {"id": user_id, "email": user_data.email, "username": default_username, "password_hash": hashed_pw, "created_at": datetime.now(timezone.utc).isoformat(), "webauthn_credentials": []}
     await db.users.insert_one(user_doc)
     streak_doc = {"id": str(uuid.uuid4()), "user_id": user_id, "current_streak": 0, "longest_streak": 0, "last_activity_date": None}
     await db.streaks.insert_one(streak_doc)
     token = create_access_token(user_id, user_data.email)
-    return {"access_token": token, "token_type": "bearer", "user": {"id": user_id, "email": user_data.email}}
+    return {"access_token": token, "token_type": "bearer", "user": {"id": user_id, "email": user_data.email, "username": default_username}}
 
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(user_data: UserLogin):
@@ -201,7 +184,21 @@ async def login(user_data: UserLogin):
     if not verify_password(user_data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token(user["id"], user["email"])
-    return {"access_token": token, "token_type": "bearer", "user": {"id": user["id"], "email": user["email"]}}
+    return {"access_token": token, "token_type": "bearer", "user": {"id": user["id"], "email": user["email"], "username": user.get("username", user["email"].split("@")[0])}}
+
+# ==================== UPDATE USERNAME ROUTE ====================
+
+@api_router.post("/auth/update-username")
+async def update_username(data: UpdateUsernameRequest, current_user: dict = Depends(get_current_user)):
+    username = data.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if len(username) < 2:
+        raise HTTPException(status_code=400, detail="Username must be at least 2 characters")
+    if len(username) > 30:
+        raise HTTPException(status_code=400, detail="Username must be 30 characters or less")
+    await db.users.update_one({"id": current_user["id"]}, {"$set": {"username": username}})
+    return {"success": True, "username": username}
 
 # ==================== WEBAUTHN ROUTES ====================
 
@@ -362,52 +359,6 @@ async def get_analytics_summary(current_user: dict = Depends(get_current_user), 
         mood_distribution[mood_type] = mood_distribution.get(mood_type, 0) + 1
     avg_intensity = sum(m["intensity"] for m in moods) / len(moods) if moods else 0
     return {"period_days": days, "total_moods": len(moods), "total_journals": len(journals), "mood_distribution": mood_distribution, "average_intensity": round(avg_intensity, 2), "current_streak": streak["current_streak"] if streak else 0, "longest_streak": streak["longest_streak"] if streak else 0, "moods_by_day": moods}
-
-# ==================== PASSWORD ROUTES ====================
-
-@api_router.post("/auth/change-password")
-async def change_password(data: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
-    if not verify_password(data.current_password, current_user["password_hash"]):
-        raise HTTPException(status_code=400, detail="Current password is incorrect")
-    new_hash = hash_password(data.new_password)
-    await db.users.update_one({"id": current_user["id"]}, {"$set": {"password_hash": new_hash}})
-    return {"success": True, "message": "Password changed successfully"}
-
-@api_router.post("/auth/forgot-password")
-async def forgot_password(data: ForgotPasswordRequest):
-    user = await db.users.find_one({"email": data.email})
-    if not user:
-        raise HTTPException(status_code=404, detail="No account found with this email")
-    new_hash = hash_password(data.new_password)
-    await db.users.update_one({"email": data.email}, {"$set": {"password_hash": new_hash}})
-    return {"success": True, "message": "Password reset successfully"}
-
-# ==================== MEDITATION ROUTES ====================
-
-@api_router.post("/meditation", response_model=MeditationSessionResponse)
-async def save_meditation_session(session: MeditationSession, current_user: dict = Depends(get_current_user)):
-    session_id = str(uuid.uuid4())
-    created_at = datetime.now(timezone.utc).isoformat()
-    session_doc = {
-        "id": session_id,
-        "user_id": current_user["id"],
-        "duration_minutes": session.duration_minutes,
-        "session_type": session.session_type,
-        "rounds_completed": session.rounds_completed,
-        "created_at": created_at
-    }
-    await db.meditation_sessions.insert_one(session_doc)
-    await update_user_streak(current_user["id"])
-    return MeditationSessionResponse(**session_doc)
-
-@api_router.get("/meditation/history", response_model=List[MeditationSessionResponse])
-async def get_meditation_history(current_user: dict = Depends(get_current_user), days: int = 30):
-    cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
-    sessions = await db.meditation_sessions.find(
-        {"user_id": current_user["id"], "created_at": {"$gte": cutoff_date.isoformat()}},
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(1000)
-    return [MeditationSessionResponse(**s) for s in sessions]
 
 # ==================== MEDIA ROUTES ====================
 # All audio files use verified direct MP3 links from archive.org

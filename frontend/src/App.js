@@ -48,6 +48,13 @@ function App() {
     localStorage.setItem('pratyahara_guest', 'true');
   };
 
+  // Called by Profile when username is updated
+  const handleUsernameUpdate = (newUsername) => {
+    const updatedUser = { ...user, username: newUsername };
+    setUser(updatedUser);
+    localStorage.setItem('pratyahara_user', JSON.stringify(updatedUser));
+  };
+
   const handleLogout = () => {
     setToken(null);
     setUser(null);
@@ -95,7 +102,11 @@ function App() {
             <Route path="/analytics" element={<Analytics token={token} isGuest={isGuest} />} />
             <Route path="/chat" element={<Chat token={token} isGuest={isGuest} />} />
             <Route path="/media" element={<MediaPlayer token={token} isGuest={isGuest} />} />
-            <Route path="/profile" element={isGuest ? <Navigate to="/" replace /> : <Profile token={token} user={user} />} />
+            <Route path="/profile" element={
+              isGuest
+                ? <Navigate to="/" replace />
+                : <Profile token={token} user={user} onUsernameUpdate={handleUsernameUpdate} />
+            } />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

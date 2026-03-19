@@ -12,10 +12,7 @@ function Dashboard({ token, user, isGuest }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isGuest) {
-      setLoading(false);
-      return;
-    }
+    if (isGuest) { setLoading(false); return; }
     fetchDashboardData();
   }, [isGuest]);
 
@@ -33,6 +30,11 @@ function Dashboard({ token, user, isGuest }) {
       setLoading(false);
     }
   };
+
+  // Resolve display name: username > email prefix > Guest
+  const displayName = isGuest
+    ? 'Guest'
+    : user?.username || user?.email?.split('@')[0] || 'Friend';
 
   if (loading) {
     return (
@@ -54,7 +56,7 @@ function Dashboard({ token, user, isGuest }) {
       {/* Welcome Header */}
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl p-8 mb-8 text-white shadow-xl">
         <h1 className="text-3xl md:text-4xl font-bold mb-2">
-          {isGuest ? 'Welcome, Guest! 🙏' : `Welcome back, ${user?.email?.split('@')[0]}! 🙏`}
+          Welcome back, {displayName}! 🙏
         </h1>
         <p className="text-purple-100 text-lg">
           {isGuest
@@ -63,7 +65,7 @@ function Dashboard({ token, user, isGuest }) {
         </p>
       </div>
 
-      {/* Guest CTA Card */}
+      {/* Guest CTA */}
       {isGuest && (
         <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-6 mb-8 flex items-start space-x-4">
           <div className="w-12 h-12 bg-amber-400 rounded-full flex items-center justify-center flex-shrink-0">
@@ -86,7 +88,7 @@ function Dashboard({ token, user, isGuest }) {
         </div>
       )}
 
-      {/* Streak Card — only for logged-in users */}
+      {/* Streak Card */}
       {!isGuest && (
         <div className="bg-white rounded-2xl p-6 mb-8 shadow-lg">
           <div className="flex items-center justify-between">
@@ -95,9 +97,7 @@ function Dashboard({ token, user, isGuest }) {
                 <Flame className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">
-                  {streak?.current_streak || 0} Day Streak!
-                </h2>
+                <h2 className="text-2xl font-bold text-gray-800">{streak?.current_streak || 0} Day Streak!</h2>
                 <p className="text-gray-600">Longest: {streak?.longest_streak || 0} days</p>
               </div>
             </div>
@@ -109,7 +109,7 @@ function Dashboard({ token, user, isGuest }) {
         </div>
       )}
 
-      {/* Stats Grid — only for logged-in users */}
+      {/* Stats Grid */}
       {!isGuest && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
@@ -124,7 +124,6 @@ function Dashboard({ token, user, isGuest }) {
             </div>
             <p className="text-sm text-gray-500">Last 7 days</p>
           </div>
-
           <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -137,7 +136,6 @@ function Dashboard({ token, user, isGuest }) {
             </div>
             <p className="text-sm text-gray-500">Last 7 days</p>
           </div>
-
           <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -145,9 +143,7 @@ function Dashboard({ token, user, isGuest }) {
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Avg Mood</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  {analytics?.average_intensity?.toFixed(1) || '0.0'}/10
-                </p>
+                <p className="text-2xl font-bold text-gray-800">{analytics?.average_intensity?.toFixed(1) || '0.0'}/10</p>
               </div>
             </div>
             <p className="text-sm text-gray-500">Last 7 days</p>
@@ -159,38 +155,19 @@ function Dashboard({ token, user, isGuest }) {
       <div className="bg-white rounded-2xl p-6 shadow-lg">
         <h3 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button
-            onClick={() => navigate('/mood')}
-            className="flex flex-col items-center p-4 rounded-xl bg-pink-50 hover:bg-pink-100 transition-colors"
-            data-testid="mood-checkin-button"
-          >
+          <button onClick={() => navigate('/mood')} className="flex flex-col items-center p-4 rounded-xl bg-pink-50 hover:bg-pink-100 transition-colors" data-testid="mood-checkin-button">
             <Heart className="w-8 h-8 text-pink-600 mb-2" />
             <span className="text-sm font-medium text-gray-700">Check Mood</span>
           </button>
-
-          <button
-            onClick={() => navigate('/meditation')}
-            className="flex flex-col items-center p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors"
-            data-testid="meditation-button"
-          >
+          <button onClick={() => navigate('/meditation')} className="flex flex-col items-center p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors" data-testid="meditation-button">
             <Timer className="w-8 h-8 text-purple-600 mb-2" />
             <span className="text-sm font-medium text-gray-700">Meditate</span>
           </button>
-
-          <button
-            onClick={() => navigate('/journal')}
-            className="flex flex-col items-center p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors"
-            data-testid="journal-button"
-          >
+          <button onClick={() => navigate('/journal')} className="flex flex-col items-center p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors" data-testid="journal-button">
             <BookOpen className="w-8 h-8 text-blue-600 mb-2" />
             <span className="text-sm font-medium text-gray-700">Journal</span>
           </button>
-
-          <button
-            onClick={() => navigate('/media')}
-            className="flex flex-col items-center p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors"
-            data-testid="media-button"
-          >
+          <button onClick={() => navigate('/media')} className="flex flex-col items-center p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors" data-testid="media-button">
             <Award className="w-8 h-8 text-green-600 mb-2" />
             <span className="text-sm font-medium text-gray-700">Media</span>
           </button>
@@ -201,8 +178,7 @@ function Dashboard({ token, user, isGuest }) {
       <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-6 border-2 border-purple-200">
         <h3 className="text-lg font-bold text-gray-800 mb-2">✨ Daily Mindfulness Tip</h3>
         <p className="text-gray-700">
-          Take 5 minutes today to practice deep breathing. Inhale peace, exhale stress.
-          Your mind will thank you! 🌿
+          Take 5 minutes today to practice deep breathing. Inhale peace, exhale stress. Your mind will thank you! 🌿
         </p>
       </div>
     </div>
