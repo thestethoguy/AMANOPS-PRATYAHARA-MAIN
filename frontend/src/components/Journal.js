@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BookOpen, Send, Calendar, Tag, LogIn } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
@@ -11,7 +10,11 @@ function Journal({ token, isGuest }) {
   const [journals, setJournals] = useState([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const navigate = useNavigate();
+
+  const goToLogin = () => {
+    localStorage.removeItem('pratyahara_guest');
+    window.location.href = '/';
+  };
 
   const moodTags = ['Happy', 'Calm', 'Anxious', 'Grateful', 'Reflective', 'Inspired', 'Peaceful'];
 
@@ -90,7 +93,7 @@ function Journal({ token, isGuest }) {
                   You can write freely below, but entries won't be saved. Create a free account to keep your journal permanently.
                 </p>
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={goToLogin}
                   className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:from-purple-700 hover:to-pink-700 transition-all"
                 >
                   <LogIn className="w-4 h-4" />
@@ -146,7 +149,7 @@ function Journal({ token, isGuest }) {
           {isGuest ? (
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={goToLogin}
               className="w-full bg-gradient-to-r from-amber-400 to-orange-400 text-white py-3 rounded-lg font-semibold hover:from-amber-500 hover:to-orange-500 transition-all flex items-center justify-center space-x-2"
             >
               <LogIn className="w-5 h-5" />

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MessageCircle, Send, Bot, User, LogIn } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
@@ -10,7 +9,11 @@ function Chat({ token, isGuest }) {
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  const navigate = useNavigate();
+
+  const goToLogin = () => {
+    localStorage.removeItem('pratyahara_guest');
+    window.location.href = '/';
+  };
 
   useEffect(() => {
     if (!isGuest) {
@@ -110,7 +113,7 @@ function Chat({ token, isGuest }) {
               It remembers your journey, speaks your language, and is available 24/7 to help you find peace. 🧘
             </p>
             <button
-              onClick={() => navigate('/')}
+              onClick={goToLogin}
               className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
             >
               <LogIn className="w-5 h-5" />
@@ -118,7 +121,7 @@ function Chat({ token, isGuest }) {
             </button>
             <p className="text-gray-400 text-xs mt-4">
               Already have an account?{' '}
-              <button onClick={() => navigate('/')} className="text-purple-500 hover:underline">
+              <button onClick={goToLogin} className="text-purple-500 hover:underline">
                 Login here
               </button>
             </p>
