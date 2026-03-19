@@ -12,9 +12,14 @@ function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [biometricSupported, setBiometricSupported] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   React.useEffect(() => {
-    // Check if WebAuthn is supported
     if (window.PublicKeyCredential) {
       setBiometricSupported(true);
     }
@@ -31,7 +36,6 @@ function Login({ onLogin }) {
         email,
         password,
       });
-
       onLogin(response.data);
     } catch (err) {
       setError(err.response?.data?.detail || 'Authentication failed');
@@ -40,34 +44,62 @@ function Login({ onLogin }) {
     }
   };
 
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotMessage('❌ Passwords do not match');
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setForgotMessage('❌ Password must be at least 6 characters');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotMessage('');
+    try {
+      await axios.post(`${API_URL}/api/auth/forgot-password`, {
+        email: forgotEmail,
+        new_password: forgotNewPassword,
+      });
+      setForgotMessage('✅ Password reset! You can now login.');
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setForgotMessage('');
+        setForgotEmail('');
+        setForgotNewPassword('');
+        setForgotConfirmPassword('');
+      }, 2000);
+    } catch (err) {
+      setForgotMessage('❌ ' + (err.response?.data?.detail || 'Reset failed'));
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   const handleBiometricLogin = async () => {
     try {
       setLoading(true);
       setError('');
 
-      // Get challenge from server
       const challengeResponse = await axios.post(`${API_URL}/api/auth/webauthn/login-challenge`, {
         email,
       });
 
       const { challenge, credentials } = challengeResponse.data;
 
-      // Create credential request
       const credentialRequestOptions = {
-        challenge: Uint8Array.from(atob(challenge), c => c.charCodeAt(0)),
+        challenge: Uint8Array.from(atob(challenge.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
         allowCredentials: credentials.map(id => ({
           type: 'public-key',
-          id: Uint8Array.from(atob(id), c => c.charCodeAt(0)),
+          id: Uint8Array.from(atob(id.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
         })),
         timeout: 60000,
       };
 
-      // Get credential from authenticator
       const assertion = await navigator.credentials.get({
         publicKey: credentialRequestOptions,
       });
 
-      // Verify with server
       const verifyResponse = await axios.post(`${API_URL}/api/auth/webauthn/login-verify`, {
         credential_id: btoa(String.fromCharCode(...new Uint8Array(assertion.rawId))),
       });
@@ -179,6 +211,18 @@ function Login({ onLogin }) {
             >
               {loading ? 'Please wait...' : isRegister ? 'Create Account' : 'Sign In'}
             </button>
+
+            {!isRegister && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-purple-600 hover:text-purple-800 font-medium"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
           </form>
 
           {/* Biometric Login */}
@@ -211,6 +255,67 @@ function Login({ onLogin }) {
         <p className="text-center text-gray-600 text-sm mt-6">
           Find peace and mindfulness every day 🧘‍♀️
         </p>
+
+        {/* Forgot Password Modal */}
+        {showForgotPassword && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Reset Password</h2>
+              <p className="text-gray-600 text-sm mb-6">Enter your email and choose a new password.</p>
+
+              {forgotMessage && (
+                <div className={`mb-4 p-3 rounded-lg text-sm ${
+                  forgotMessage.includes('✅')
+                    ? 'bg-green-50 border border-green-200 text-green-700'
+                    : 'bg-red-50 border border-red-200 text-red-700'
+                }`}>
+                  {forgotMessage}
+                </div>
+              )}
+
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <input
+                  type="email"
+                  placeholder="Your email address"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="New password"
+                  value={forgotNewPassword}
+                  onChange={(e) => setForgotNewPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm new password"
+                  value={forgotConfirmPassword}
+                  onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
+                >
+                  {forgotLoading ? 'Resetting...' : 'Reset Password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForgotPassword(false); setForgotMessage(''); }}
+                  className="w-full py-3 border-2 border-gray-200 text-gray-600 rounded-lg font-medium hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -117,6 +117,14 @@ class WebAuthnVerifyRequest(BaseModel):
     user_id: str
     credential: Dict[str, Any]
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str    
+
 class MeditationSession(BaseModel):
     duration_minutes: int
     session_type: str = "meditation"
@@ -354,6 +362,25 @@ async def get_analytics_summary(current_user: dict = Depends(get_current_user), 
         mood_distribution[mood_type] = mood_distribution.get(mood_type, 0) + 1
     avg_intensity = sum(m["intensity"] for m in moods) / len(moods) if moods else 0
     return {"period_days": days, "total_moods": len(moods), "total_journals": len(journals), "mood_distribution": mood_distribution, "average_intensity": round(avg_intensity, 2), "current_streak": streak["current_streak"] if streak else 0, "longest_streak": streak["longest_streak"] if streak else 0, "moods_by_day": moods}
+
+# ==================== PASSWORD ROUTES ====================
+
+@api_router.post("/auth/change-password")
+async def change_password(data: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    if not verify_password(data.current_password, current_user["password_hash"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    new_hash = hash_password(data.new_password)
+    await db.users.update_one({"id": current_user["id"]}, {"$set": {"password_hash": new_hash}})
+    return {"success": True, "message": "Password changed successfully"}
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest):
+    user = await db.users.find_one({"email": data.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found with this email")
+    new_hash = hash_password(data.new_password)
+    await db.users.update_one({"email": data.email}, {"$set": {"password_hash": new_hash}})
+    return {"success": True, "message": "Password reset successfully"}
 
 # ==================== MEDITATION ROUTES ====================
 
