@@ -1,18 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MessageCircle, Send, Bot, User } from 'lucide-react';
+import { MessageCircle, Send, Bot, User, LogIn } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
-function Chat({ token }) {
+function Chat({ token, isGuest }) {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchChatHistory();
-  }, []);
+    if (!isGuest) {
+      fetchChatHistory();
+    }
+  }, [isGuest]);
 
   useEffect(() => {
     scrollToBottom();
@@ -40,7 +44,6 @@ function Chat({ token }) {
     const userMessage = inputMessage.trim();
     setInputMessage('');
 
-    // Add user message to UI immediately
     const userMsg = {
       id: Date.now().toString(),
       role: 'user',
@@ -48,7 +51,6 @@ function Chat({ token }) {
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
-
     setLoading(true);
 
     try {
@@ -57,8 +59,6 @@ function Chat({ token }) {
         { message: userMessage },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-
-      // Add assistant response
       const assistantMsg = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -68,7 +68,6 @@ function Chat({ token }) {
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (error) {
       console.error('Error sending message:', error);
-      // Add error message
       const errorMsg = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -80,6 +79,55 @@ function Chat({ token }) {
       setLoading(false);
     }
   };
+
+  // ─── GUEST BLOCK ────────────────────────────────────────────
+  if (isGuest) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8 h-[calc(100vh-8rem)]" data-testid="chat">
+        <div className="bg-white rounded-2xl shadow-xl h-full flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-6 rounded-t-2xl">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
+                <Bot className="w-7 h-7 text-purple-600" />
+              </div>
+              <h1 className="text-2xl font-bold text-white">Mindfulness Assistant</h1>
+            </div>
+          </div>
+
+          {/* Locked State */}
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+            <div className="w-24 h-24 bg-purple-100 rounded-full flex items-center justify-center mb-6">
+              <Bot className="w-12 h-12 text-purple-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-3">
+              Chat is for Members Only
+            </h2>
+            <p className="text-gray-500 mb-2 max-w-sm">
+              Create a free account to talk with your personal AI mindfulness assistant.
+            </p>
+            <p className="text-gray-400 text-sm mb-8 max-w-sm">
+              It remembers your journey, speaks your language, and is available 24/7 to help you find peace. 🧘
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-purple-700 hover:to-pink-700 transition-all shadow-lg"
+            >
+              <LogIn className="w-5 h-5" />
+              <span>Sign Up — It's Free!</span>
+            </button>
+            <p className="text-gray-400 text-xs mt-4">
+              Already have an account?{' '}
+              <button onClick={() => navigate('/')} className="text-purple-500 hover:underline">
+                Login here
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  // ────────────────────────────────────────────────────────────
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 h-[calc(100vh-8rem)]" data-testid="chat">
@@ -111,21 +159,11 @@ function Chat({ token }) {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div className={`flex items-start space-x-2 max-w-[80%] ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    msg.role === 'user' ? 'bg-purple-600' : 'bg-pink-100'
-                  }`}>
-                    {msg.role === 'user' ? (
-                      <User className="w-5 h-5 text-white" />
-                    ) : (
-                      <Bot className="w-5 h-5 text-pink-600" />
-                    )}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-purple-600' : 'bg-pink-100'}`}>
+                    {msg.role === 'user' ? <User className="w-5 h-5 text-white" /> : <Bot className="w-5 h-5 text-pink-600" />}
                   </div>
                   <div
-                    className={`px-4 py-3 rounded-2xl ${
-                      msg.role === 'user'
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
+                    className={`px-4 py-3 rounded-2xl ${msg.role === 'user' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-800'}`}
                     data-testid={`message-${msg.role}`}
                   >
                     <p className="whitespace-pre-wrap">{msg.content}</p>
