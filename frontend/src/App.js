@@ -23,25 +23,30 @@ function App() {
     const storedToken = localStorage.getItem('pratyahara_token');
     const storedUser = localStorage.getItem('pratyahara_user');
     const storedGuest = localStorage.getItem('pratyahara_guest');
+
     if (storedToken && storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      // Always inject the separately stored username on load
+      const savedUsername = localStorage.getItem('pratyahara_username');
+      if (savedUsername) {
+        parsedUser.username = savedUsername;
+      }
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      setUser(parsedUser);
     } else if (storedGuest === 'true') {
       setIsGuest(true);
     }
     setLoading(false);
   }, []);
 
- const handleLogin = (authData) => {
-    // Preserve existing username if backend doesn't return one
-    const existingUser = localStorage.getItem('pratyahara_user');
-    const existingUsername = existingUser
-      ? JSON.parse(existingUser).username
-      : null;
+  const handleLogin = (authData) => {
+    // Read the separately stored username — survives login/logout cycles
+    const savedUsername = localStorage.getItem('pratyahara_username');
 
     const mergedUser = {
       ...authData.user,
-      username: authData.user.username || existingUsername || null,
+      // Priority: separately saved username > what backend returns > null
+      username: savedUsername || authData.user.username || null,
     };
 
     setToken(authData.access_token);
@@ -59,8 +64,11 @@ function App() {
     localStorage.setItem('pratyahara_guest', 'true');
   };
 
-  // Called by Profile when username is updated
+  // Called by Profile when user saves a new display name
   const handleUsernameUpdate = (newUsername) => {
+    // Save to its OWN key — this is never wiped by login
+    localStorage.setItem('pratyahara_username', newUsername);
+
     const updatedUser = { ...user, username: newUsername };
     setUser(updatedUser);
     localStorage.setItem('pratyahara_user', JSON.stringify(updatedUser));
@@ -73,6 +81,8 @@ function App() {
     localStorage.removeItem('pratyahara_token');
     localStorage.removeItem('pratyahara_user');
     localStorage.removeItem('pratyahara_guest');
+    // NOTE: We intentionally do NOT remove 'pratyahara_username'
+    // so it persists across logout/login on the same device
   };
 
   if (loading) {
