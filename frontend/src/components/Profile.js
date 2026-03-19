@@ -1,8 +1,53 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { User, Mail, Lock, Fingerprint, Bell, Shield, Settings as SettingsIcon, Edit2, Check, X } from 'lucide-react';
+import { User, Mail, Lock, Fingerprint, Bell, BellOff, Shield, Settings as SettingsIcon, Edit2, Check, X } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
+// ── Notification helpers ──────────────────────────────────────
+const NOTIF_KEY = 'pratyahara_notifications_enabled';
+const LAST_NOTIF_KEY = 'pratyahara_last_notification';
+
+function requestAndScheduleNotifications() {
+  if (!('Notification' in window)) return;
+
+  Notification.requestPermission().then((permission) => {
+    if (permission === 'granted') {
+      localStorage.setItem(NOTIF_KEY, 'true');
+      // Fire a welcome notification immediately
+      new Notification('🧘 PRATYAHARA', {
+        body: 'Daily reminders are ON! We\'ll remind you to practise mindfulness every day.',
+        icon: '/favicon.ico',
+      });
+      localStorage.setItem(LAST_NOTIF_KEY, Date.now().toString());
+    }
+  });
+}
+
+function checkAndFireDailyReminder() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  if (localStorage.getItem(NOTIF_KEY) !== 'true') return;
+
+  const last = parseInt(localStorage.getItem(LAST_NOTIF_KEY) || '0', 10);
+  const twentyFourHours = 24 * 60 * 60 * 1000;
+  if (Date.now() - last >= twentyFourHours) {
+    const messages = [
+      'Take a deep breath — your mind deserves a moment of peace today. 🌿',
+      'Just 5 minutes of meditation can change your whole day. Start now! 🧘',
+      'How are you feeling today? Log your mood on PRATYAHARA. 💜',
+      'A calm mind is a strong mind. Come back to your practice today. ✨',
+      'Your mindfulness streak is waiting for you! Don\'t break the chain. 🔥',
+    ];
+    const msg = messages[Math.floor(Math.random() * messages.length)];
+    new Notification('🧘 Daily Mindfulness Reminder', {
+      body: msg,
+      icon: '/favicon.ico',
+    });
+    localStorage.setItem(LAST_NOTIF_KEY, Date.now().toString());
+  }
+}
+// ─────────────────────────────────────────────────────────────
 
 function Profile({ token, user, onUsernameUpdate }) {
   const [activeTab, setActiveTab] = useState('profile');
@@ -26,27 +71,62 @@ function Profile({ token, user, onUsernameUpdate }) {
   const [passwordMessage, setPasswordMessage] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
 
-  // Current display name
+  // Notification state
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    localStorage.getItem(NOTIF_KEY) === 'true' && Notification.permission === 'granted'
+  );
+  const [notifMessage, setNotifMessage] = useState('');
+
+  // Fire daily reminder check when profile loads
+  useEffect(() => {
+    checkAndFireDailyReminder();
+  }, []);
+
   const displayName = user?.username || user?.email?.split('@')[0] || '';
 
+  // ── Notification toggle handler ──
+  const handleNotificationToggle = () => {
+    if (!('Notification' in window)) {
+      setNotifMessage('❌ Your browser does not support notifications.');
+      return;
+    }
+
+    if (!notificationsEnabled) {
+      // Turning ON
+      if (Notification.permission === 'granted') {
+        localStorage.setItem(NOTIF_KEY, 'true');
+        setNotificationsEnabled(true);
+        new Notification('🧘 PRATYAHARA', {
+          body: 'Daily reminders are back ON! See you every day. 🌿',
+          icon: '/favicon.ico',
+        });
+        localStorage.setItem(LAST_NOTIF_KEY, Date.now().toString());
+        setNotifMessage('✅ Notifications enabled! You\'ll get a daily reminder.');
+      } else if (Notification.permission === 'denied') {
+        setNotifMessage('❌ Notifications are blocked. Please allow them in your browser settings → Site Settings → Notifications.');
+      } else {
+        requestAndScheduleNotifications();
+        setNotificationsEnabled(true);
+        setNotifMessage('✅ Notifications enabled! You\'ll get a daily reminder.');
+      }
+    } else {
+      // Turning OFF
+      localStorage.setItem(NOTIF_KEY, 'false');
+      setNotificationsEnabled(false);
+      setNotifMessage('🔕 Daily reminders turned off.');
+    }
+
+    setTimeout(() => setNotifMessage(''), 4000);
+  };
+
+  // ── Username handlers ──
   const handleSaveUsername = async () => {
     const trimmed = usernameInput.trim();
-    if (!trimmed) {
-      setUsernameMessage('❌ Username cannot be empty');
-      return;
-    }
-    if (trimmed.length < 2) {
-      setUsernameMessage('❌ Username must be at least 2 characters');
-      return;
-    }
-    if (trimmed.length > 30) {
-      setUsernameMessage('❌ Username must be 30 characters or less');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_. ]+$/.test(trimmed)) {
-      setUsernameMessage('❌ Only letters, numbers, spaces, dots and underscores allowed');
-      return;
-    }
+    if (!trimmed) { setUsernameMessage('❌ Username cannot be empty'); return; }
+    if (trimmed.length < 2) { setUsernameMessage('❌ Must be at least 2 characters'); return; }
+    if (trimmed.length > 30) { setUsernameMessage('❌ Must be 30 characters or less'); return; }
+    if (!/^[a-zA-Z0-9_. ]+$/.test(trimmed)) { setUsernameMessage('❌ Only letters, numbers, spaces, dots and underscores allowed'); return; }
+
     setUsernameLoading(true);
     setUsernameMessage('');
     try {
@@ -72,15 +152,10 @@ function Profile({ token, user, onUsernameUpdate }) {
     setUsernameMessage('');
   };
 
+  // ── Password handler ──
   const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      setPasswordMessage('❌ New passwords do not match');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setPasswordMessage('❌ New password must be at least 6 characters');
-      return;
-    }
+    if (newPassword !== confirmPassword) { setPasswordMessage('❌ New passwords do not match'); return; }
+    if (newPassword.length < 6) { setPasswordMessage('❌ New password must be at least 6 characters'); return; }
     setPasswordLoading(true);
     setPasswordMessage('');
     try {
@@ -90,9 +165,7 @@ function Profile({ token, user, onUsernameUpdate }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setPasswordMessage('✅ Password changed successfully!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setShowPasswordForm(false);
     } catch (error) {
       setPasswordMessage('❌ ' + (error.response?.data?.detail || 'Failed to change password'));
@@ -101,13 +174,10 @@ function Profile({ token, user, onUsernameUpdate }) {
     }
   };
 
+  // ── Biometric handler ──
   const handleEnableBiometric = async () => {
-    if (!window.PublicKeyCredential) {
-      setMessage('Biometric authentication not supported on this device');
-      return;
-    }
-    setLoading(true);
-    setMessage('');
+    if (!window.PublicKeyCredential) { setMessage('Biometric authentication not supported on this device'); return; }
+    setLoading(true); setMessage('');
     try {
       const challengeResponse = await axios.post(
         `${API_URL}/api/auth/webauthn/register-challenge`,
@@ -123,10 +193,7 @@ function Profile({ token, user, onUsernameUpdate }) {
           name: user.email,
           displayName: displayName,
         },
-        pubKeyCredParams: [
-          { alg: -7, type: 'public-key' },
-          { alg: -257, type: 'public-key' },
-        ],
+        pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
         authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
         timeout: 60000,
         attestation: 'direct',
@@ -146,7 +213,6 @@ function Profile({ token, user, onUsernameUpdate }) {
       setBiometricEnabled(true);
       setMessage('✅ Biometric authentication enabled successfully!');
     } catch (error) {
-      console.error('Biometric setup error:', error);
       setMessage('❌ Failed to enable biometric authentication. ' + (error.message || ''));
     } finally {
       setLoading(false);
@@ -193,24 +259,17 @@ function Profile({ token, user, onUsernameUpdate }) {
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Personal Information</h2>
           <div className="space-y-6">
-
-            {/* Username Field */}
+            {/* Username */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <User className="inline w-4 h-4 mr-2" />
                 Display Name
               </label>
-
               {usernameMessage && (
-                <div className={`mb-3 p-3 rounded-lg text-sm ${
-                  usernameMessage.includes('✅')
-                    ? 'bg-green-50 border border-green-200 text-green-700'
-                    : 'bg-red-50 border border-red-200 text-red-700'
-                }`}>
+                <div className={`mb-3 p-3 rounded-lg text-sm ${usernameMessage.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
                   {usernameMessage}
                 </div>
               )}
-
               {!isEditingUsername ? (
                 <div className="flex items-center space-x-3">
                   <div className="flex-1 px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-800 font-medium">
@@ -236,50 +295,34 @@ function Profile({ token, user, onUsernameUpdate }) {
                     maxLength={30}
                     autoFocus
                   />
-                  <p className="text-xs text-gray-400">{usernameInput.length}/30 characters · Letters, numbers, spaces, dots and underscores only</p>
+                  <p className="text-xs text-gray-400">{usernameInput.length}/30 · Letters, numbers, spaces, dots, underscores only</p>
                   <div className="flex gap-3">
-                    <button
-                      onClick={handleSaveUsername}
-                      disabled={usernameLoading}
-                      className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
-                    >
+                    <button onClick={handleSaveUsername} disabled={usernameLoading} className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-2 rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50">
                       <Check className="w-4 h-4" />
                       <span>{usernameLoading ? 'Saving...' : 'Save Name'}</span>
                     </button>
-                    <button
-                      onClick={handleCancelUsername}
-                      className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
-                    >
+                    <button onClick={handleCancelUsername} className="flex items-center justify-center space-x-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all">
                       <X className="w-4 h-4" />
                       <span>Cancel</span>
                     </button>
                   </div>
                 </div>
               )}
-              <p className="text-xs text-gray-400 mt-2">
-                This name appears on your dashboard and throughout the app.
-              </p>
+              <p className="text-xs text-gray-400 mt-2">This name appears on your dashboard and throughout the app.</p>
             </div>
 
-            {/* Email Field (read-only) */}
+            {/* Email (read-only) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 <Mail className="inline w-4 h-4 mr-2" />
                 Email Address
               </label>
-              <input
-                type="email"
-                value={user?.email}
-                disabled
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
-              />
+              <input type="email" value={user?.email} disabled className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500" />
               <p className="text-xs text-gray-400 mt-1">Email cannot be changed.</p>
             </div>
 
             <div className="pt-4 border-t">
-              <p className="text-gray-600 text-sm">
-                Your personal information is secure. We use industry-standard encryption to protect your data.
-              </p>
+              <p className="text-gray-600 text-sm">Your personal information is secure. We use industry-standard encryption to protect your data.</p>
             </div>
           </div>
         </div>
@@ -289,15 +332,11 @@ function Profile({ token, user, onUsernameUpdate }) {
       {activeTab === 'security' && (
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Security Settings</h2>
-
           {message && (
-            <div className={`mb-6 p-4 rounded-lg ${
-              message.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-            }`}>
+            <div className={`mb-6 p-4 rounded-lg ${message.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
               {message}
             </div>
           )}
-
           <div className="space-y-6">
             {/* Biometric */}
             <div className="p-6 border-2 border-purple-200 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50">
@@ -307,9 +346,7 @@ function Profile({ token, user, onUsernameUpdate }) {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-gray-800 mb-1">Biometric Authentication</h3>
-                  <p className="text-gray-600 text-sm mb-4">
-                    Use fingerprint or face recognition to login quickly and securely.
-                  </p>
+                  <p className="text-gray-600 text-sm mb-3">Use fingerprint or face recognition to login quickly and securely.</p>
                   <div className="space-y-1 text-sm text-gray-600 mb-4">
                     <p>✓ Fingerprint reader support</p>
                     <p>✓ Face ID / Windows Hello</p>
@@ -336,20 +373,13 @@ function Profile({ token, user, onUsernameUpdate }) {
                 <div className="flex-1">
                   <h3 className="text-lg font-bold text-gray-800 mb-1">Password</h3>
                   <p className="text-gray-600 text-sm mb-4">Your password is encrypted and stored securely.</p>
-
                   {passwordMessage && (
-                    <div className={`mb-4 p-3 rounded-lg text-sm ${
-                      passwordMessage.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-                    }`}>
+                    <div className={`mb-4 p-3 rounded-lg text-sm ${passwordMessage.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'}`}>
                       {passwordMessage}
                     </div>
                   )}
-
                   {!showPasswordForm ? (
-                    <button
-                      onClick={() => setShowPasswordForm(true)}
-                      className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all"
-                    >
+                    <button onClick={() => setShowPasswordForm(true)} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-all">
                       Change Password
                     </button>
                   ) : (
@@ -379,19 +409,60 @@ function Profile({ token, user, onUsernameUpdate }) {
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">App Settings</h2>
           <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-              <div className="flex items-center space-x-4">
-                <Bell className="w-6 h-6 text-purple-600" />
-                <div>
-                  <h3 className="font-semibold text-gray-800">Daily Reminders</h3>
-                  <p className="text-gray-600 text-sm">Get reminded to practice mindfulness</p>
+
+            {/* Daily Reminders toggle */}
+            <div className="p-4 border border-gray-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  {notificationsEnabled
+                    ? <Bell className="w-6 h-6 text-purple-600" />
+                    : <BellOff className="w-6 h-6 text-gray-400" />
+                  }
+                  <div>
+                    <h3 className="font-semibold text-gray-800">Daily Reminders</h3>
+                    <p className="text-gray-500 text-sm">
+                      {notificationsEnabled
+                        ? 'You\'ll get a daily mindfulness reminder'
+                        : 'Get reminded to practice mindfulness'}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={handleNotificationToggle}
+                  className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors focus:outline-none ${
+                    notificationsEnabled ? 'bg-purple-600' : 'bg-gray-200'
+                  }`}
+                  aria-label="Toggle daily reminders"
+                >
+                  <span className={`inline-block w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    notificationsEnabled ? 'translate-x-5' : 'translate-x-1'
+                  }`} />
+                </button>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-              </label>
+
+              {notifMessage && (
+                <div className={`mt-3 p-3 rounded-lg text-sm ${
+                  notifMessage.includes('✅') ? 'bg-green-50 border border-green-200 text-green-700'
+                  : notifMessage.includes('🔕') ? 'bg-gray-50 border border-gray-200 text-gray-600'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+                }`}>
+                  {notifMessage}
+                </div>
+              )}
+
+              {/* Status indicator */}
+              <div className="mt-3 flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  notificationsEnabled ? 'bg-green-500' : 'bg-gray-300'
+                }`} />
+                <p className="text-xs text-gray-400">
+                  {notificationsEnabled
+                    ? 'Active — you\'ll be reminded once every 24 hours when you open the app'
+                    : 'Inactive — turn on to receive daily reminders'}
+                </p>
+              </div>
             </div>
+
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
               <p className="text-gray-600 text-sm">
                 More settings coming soon: themes, language preferences, data export, and more!
