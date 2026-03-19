@@ -554,10 +554,10 @@ REACT_APP_BACKEND_URL = https://your-render-service.onrender.com
 
 ## 👨‍💻 Author
 
-**Aman Aaryan** — [@thestethoguy](https://github.com/thestethoguy)
-**Raman Kurmi**
-**Alakesh Chetia**
-**Siddhant Singh**
+**Aman Aaryan\n** — [@thestethoguy](https://github.com/thestethoguy)
+**Raman Kurmi\n**
+**Alakesh Chetia\n**
+**Siddhant Singh\n**
 
 Built from scratch as a team full-stack project exploring React, FastAPI, MongoDB, WebAuthn, and AI integration — all in a single cohesive wellness product.
 
