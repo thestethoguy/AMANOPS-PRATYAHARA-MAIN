@@ -32,12 +32,23 @@ function App() {
     setLoading(false);
   }, []);
 
-  const handleLogin = (authData) => {
+ const handleLogin = (authData) => {
+    // Preserve existing username if backend doesn't return one
+    const existingUser = localStorage.getItem('pratyahara_user');
+    const existingUsername = existingUser
+      ? JSON.parse(existingUser).username
+      : null;
+
+    const mergedUser = {
+      ...authData.user,
+      username: authData.user.username || existingUsername || null,
+    };
+
     setToken(authData.access_token);
-    setUser(authData.user);
+    setUser(mergedUser);
     setIsGuest(false);
     localStorage.setItem('pratyahara_token', authData.access_token);
-    localStorage.setItem('pratyahara_user', JSON.stringify(authData.user));
+    localStorage.setItem('pratyahara_user', JSON.stringify(mergedUser));
     localStorage.removeItem('pratyahara_guest');
   };
 
